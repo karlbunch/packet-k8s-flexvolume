@@ -1,0 +1,60 @@
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: fv-packet-zfs-test1
+spec:
+  accessModes:
+    - ReadWriteMany
+  capacity:
+    storage: 20Gi
+  claimRef:
+    name: fv-packet-zfs-test-data
+    namespace: default
+  flexVolume:
+    driver: packet/flexvolume
+    fsType: zfs
+    options:
+      packet.net/zfs/numVolumes: 2
+      packet.net/zfs/vdevType: "mirror"
+      packet.net/zfs/sizeGb: 20
+      packet.net/zfs/createOptions: "-o ashift=13 -O recordsize=16k"
+      packet.net/zfs/snapshotOnMount: "true"
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: manual
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: fv-packet-zfs-test-data
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 20Gi
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: fv-packet-zfs-test
+spec:
+  containers:
+    - name: fv-packet-zfspd-rw
+      image: ubuntu
+      command:
+        - sh
+        - -c
+        - "date >> /mnt/fv-packet-zfs/${KUBE_NODE};sleep infinity"
+      env:
+        - name: KUBE_NODE
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+      volumeMounts:
+        - name: fv-packet-zfspd-rw
+          mountPath: "/mnt/fv-packet-zfs"
+  volumes:
+    - name: fv-packet-zfspd-rw
+      persistentVolumeClaim:
+        claimName: fv-packet-zfs-test-data

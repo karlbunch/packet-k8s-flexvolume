@@ -1,0 +1,18 @@
+---
+allowCreate: true
+maxSize: 1000
+apikey: YK2Ko3cT9BKdMHeazxYqbmfR5G4aGy1m
+project:
+  name: "My cool project"
+  id: 893f171d-fc19-4e1a-8d6f-7e36e1324692
+facility:
+  code: ewr1
+  id: e1e9c52e-a0bc-4117-b996-0fc94843ea09
+plans:
+  - name: Standard
+    id: 87728148-3155-4992-a730-8d1e6aca8a32
+    isDefault: true
+  - name: Performance
+    id: d6570cfb-38fa-4467-92b3-e45d059bb249
+
+# :vim:set ft=yaml
