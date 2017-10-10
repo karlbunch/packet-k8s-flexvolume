@@ -7,12 +7,18 @@ clean:
 	kubectl delete -f test-packet-volume-zfs.yaml
 
 push:
-	set -x;for host in $$(kubectl get nodes -o jsonpath='{range.items[*]}{.metadata.name}{"\n"}{end}'); \
+	set -x;\
+	rm -fr stage; \
+	mkdir -p stage/lib; \
+	cp -ar flexvolume stage/lib; \
+	cp -ar packet-python/packet stage/lib; \
+	cp plugin stage/flexvolume; \
+	for host in $$(kubectl get nodes -o jsonpath='{range.items[*]}{.metadata.name}{"\n"}{end}'); \
 	do \
 	    echo "Push to $$host"; \
-	    ssh -q $$host 'logger -t fv_packet_zfs "#################### PUSHING ####################"'; \
-	    scp -q /etc/kubernetes/packet-volume.conf $$host:/etc/kubernetes/packet-volume.conf; \
-	    scp -q -r flexvolume $$host:/usr/libexec/kubernetes/kubelet-plugins/volume/exec/packet~flexvolume/; \
+	    ssh -q $$host 'logger -t fv_packet_zfs "#################### PUSHING packet~flexvolume ####################"'; \
+	    scp -q flexvolume-packet.conf /etc/kubernetes/flexvolume-packet.conf; \
+	    scp -q -r stage/. $$host:/usr/libexec/kubernetes/kubelet-plugins/volume/exec/packet~flexvolume/; \
 	done;
 
 test-live:
