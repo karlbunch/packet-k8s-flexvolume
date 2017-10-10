@@ -1,5 +1,5 @@
 # don't accidentally include conf file it has the api secrets
-packet-volume.conf
+flexvolume-packet.conf
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

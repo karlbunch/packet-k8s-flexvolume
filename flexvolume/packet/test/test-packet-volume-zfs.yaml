@@ -15,9 +15,9 @@ spec:
     driver: packet/flexvolume
     fsType: zfs
     options:
-      packet.net/zfs/numVolumes: 2
+      packet.net/numVolumes: "2"
+      packet.net/sizeGb: "20"
       packet.net/zfs/vdevType: "mirror"
-      packet.net/zfs/sizeGb: 20
       packet.net/zfs/createOptions: "-o ashift=13 -O recordsize=16k"
       packet.net/zfs/snapshotOnMount: "true"
   persistentVolumeReclaimPolicy: Retain

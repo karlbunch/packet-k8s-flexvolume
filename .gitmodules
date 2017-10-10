@@ -1,0 +1,3 @@
+[submodule "packet-python"]
+	path = packet-python
+	url = git@github.com:karlbunch/packet-python.git
