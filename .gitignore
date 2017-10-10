@@ -1,5 +1,6 @@
 # don't accidentally include conf file it has the api secrets
 flexvolume-packet.conf
+stage/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
