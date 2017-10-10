@@ -25,3 +25,9 @@ class OperationFailureError(Exception):
     def __init__(self, message):
         self.message = message
         super(OperationFailureError, self).__init__(message)
+
+class OperationInvalidOptionsError(Exception):
+    """ Raised when invalid options are found fails """
+    def __init__(self, message):
+        self.message = message
+        super(OperationInvalidOptionsError, self).__init__(message)

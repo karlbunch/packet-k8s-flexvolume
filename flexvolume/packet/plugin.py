@@ -31,6 +31,7 @@
 import glob
 import json
 import logging
+import logging.handlers
 import os
 import subprocess
 import time
@@ -42,7 +43,7 @@ import yaml
 import packet
 
 from .filesystem import get_handler
-from .exceptions import OperationFailureError, PipeExecError
+from .exceptions import OperationFailureError, OperationInvalidOptionsError, PipeExecError
 
 def Run(args):
     """ Run an operation output status json to stdout """
@@ -66,7 +67,7 @@ class Plugin(object):
 
                 handler.ident = 'packet-volume'
 
-            handler.setFormatter(logging.Formatter('%(name)s %(process)d %(levelname)s %(message)s'))
+            handler.setFormatter(logging.Formatter('[%(process)d] %(levelname)s %(message)s'))
 
             self.log = logging.getLogger("packet-volume")
             self.log.setLevel(logging.DEBUG)
@@ -185,7 +186,8 @@ class Plugin(object):
             return result
         except OperationFailureError as op_err:
             return self.response(status="Failure", message=op_err.message)
-
+        except OperationInvalidOptionsError as op_err:
+            return self.response(status="Failure", message="Invalid flexVolume.options: %s" % op_err.message)
         except: # pylint: disable=bare-except
             self.log.info("Exception Calling %s(%s)\n%s", handler_name, args, traceback.format_exc())
             return self.response(status="Failure", message="Driver error, check syslog for details.")
@@ -218,17 +220,20 @@ class Plugin(object):
             if opts["packet.net/zfs/snapshotOnMount"] == "true":
                 zfs_options["snapshotOnMount"] = True
 
-        options = types.SimpleNamespace(**{
-            "volumeName": opts["kubernetes.io/pvOrVolumeName"],
-            "fsType": opts["kubernetes.io/fsType"],
-            "readwrite": opts["kubernetes.io/readwrite"] if "kubernetes.io/readwrite" in opts else "rw",
-            "packet": types.SimpleNamespace(**{
-                "sizeGb": int(opts["packet.net/sizeGb"]),
-                "plan": opts["packet.net/plan"] if "packet.net/plan" in opts else None,
-                "numVolumes": numVolumes,
-                "zfs": types.SimpleNamespace(**zfs_options)
-            }),
-        })
+        try:
+            options = types.SimpleNamespace(**{
+                "volumeName": opts["kubernetes.io/pvOrVolumeName"],
+                "fsType": opts["kubernetes.io/fsType"],
+                "readwrite": opts["kubernetes.io/readwrite"] if "kubernetes.io/readwrite" in opts else "rw",
+                "packet": types.SimpleNamespace(**{
+                    "sizeGb": int(opts["packet.net/sizeGb"]),
+                    "plan": opts["packet.net/plan"] if "packet.net/plan" in opts else None,
+                    "numVolumes": numVolumes,
+                    "zfs": types.SimpleNamespace(**zfs_options)
+                }),
+            })
+        except KeyError as err:
+            raise OperationInvalidOptionsError("Missing required key: %s" % err)
 
         return options
 

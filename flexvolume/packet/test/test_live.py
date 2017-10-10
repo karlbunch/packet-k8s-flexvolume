@@ -9,6 +9,7 @@ import curses
 import io
 import json
 import logging
+import logging.handlers
 import os
 import subprocess
 import sys
