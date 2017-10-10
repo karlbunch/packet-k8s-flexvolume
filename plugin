@@ -1,0 +1,19 @@
+#!/usr/bin/python3 -B
+"""
+Run the plugin
+
+Kubernetes expects this file to be on nodes at:
+
+    /usr/libexec/kubernetes/kubelet-plugins/volume/exec/packet~flexvolume/flexvolume
+
+"""
+
+import sys
+import os
+
+if __name__ == '__main__':
+    dir = os.path.normpath(os.path.dirname(__file__))
+    sys.path.append(dir)
+    sys.path.append("%s/lib" % dir)
+    from flexvolume.packet import run_plugin
+    sys.exit(run_plugin())
