@@ -2,6 +2,8 @@
 flexvolume-packet.conf
 stage/
 
+.*.swp
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
