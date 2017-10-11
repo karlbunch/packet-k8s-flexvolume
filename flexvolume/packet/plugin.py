@@ -259,12 +259,12 @@ class Plugin(object):
         for volume in self.get_manager().list_volumes(self.config["project"]["id"]):
             metadata = yaml.load(volume.description)
 
-            if not isinstance(metadata, dict) or "volumeName" not in metadata:
+            if not isinstance(metadata, dict) or "pv" not in metadata:
                 continue
 
             self.log.debug("Found volume %s @ %s = %s", volume.id, volume.facility.code, metadata)
 
-            if metadata['volumeName'] == options.volumeName:
+            if metadata['pv'] == options.volumeName:
                 if volume.facility.code == self.config["facility"]["code"]:
                     volumes.append(volume)
                 else:
@@ -302,10 +302,11 @@ class Plugin(object):
             volumeOptions = {
                 "project_id" : self.config["project"]["id"],
                 "description": yaml.dump({
-                    "volumeName": options.volumeName,
-                    "volumeNum": vol_num + 1,
-                    "numVolumes": options.packet.numVolumes,
-                    "fsType": options.fsType
+                    "pv": options.volumeName,
+                    "seq": vol_num + 1,
+                    "total": options.packet.numVolumes,
+                    "type": options.fsType,
+                    "version": "v1"
                     }),
                 "plan"       : plan["id"],
                 "size"       : options.packet.sizeGb,
