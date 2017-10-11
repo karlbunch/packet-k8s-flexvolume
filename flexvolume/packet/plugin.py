@@ -28,6 +28,7 @@
 
 """
 
+import fcntl
 import glob
 import json
 import logging
@@ -56,6 +57,7 @@ class Plugin(object):
         self.config = yaml.load(open(os.path.expanduser("/etc/kubernetes/flexvolume-packet.conf")))
         self.api_manager = None
         self.fs_handler = None
+        self.lock_fh = {}
 
         if logger:
             self.log = logger
@@ -84,12 +86,41 @@ class Plugin(object):
 
         return self.api_manager
 
+    def get_lock(self, lock_key):
+        """ Acquire a simple lock on an operation """
+        lock_key = "/tmp/lck.flexvolume.packet.%s" % lock_key.replace("/", "-").replace(".", "_")
+        self.lock_fh[lock_key] = open(lock_key, "w")
+        tm_start = time.time()
+        fcntl.lockf(self.lock_fh[lock_key].fileno(), fcntl.LOCK_EX)
+        self.log.debug("Waited %.02f second(s) to get lock %s", time.time() - tm_start, lock_key)
+        return lock_key
+
+    def release_lock(self, lock_key):
+        """ Acquire a simple lock on an operation """
+        if lock_key in self.lock_fh:
+            fcntl.lockf(self.lock_fh[lock_key].fileno(), fcntl.LOCK_UN)
+            self.lock_fh[lock_key].close()
+            os.unlink(lock_key)
+            self.lock_fh.pop(lock_key, None)
+        else:
+            self.log.warning("Attempt to clear non-existant lock? %s", lock_key)
+
     # TODO Make this into a utility function at module level?
-    def pipe_exec(self, cmd, log_stdout=False):
+    def pipe_exec(self, cmd, log_stdout=False, lock_cmd=False):
         """ Run command capturing stdout/stderr, raise exception if returncode != 0 """
         self.log.debug("run: %s", str(cmd))
 
+        lock_handle = None
+
+        if lock_cmd:
+            self.log.debug("Getting lock for %s", cmd[0])
+            lock_handle = self.get_lock(cmd[0])
+
         result = subprocess.run(cmd, check=False, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+
+        if lock_cmd:
+            self.log.debug("Release lock for %s", cmd[0])
+            self.release_lock(lock_handle)
 
         if log_stdout:
             self.log.info("run...: %s", str(cmd))
@@ -412,7 +443,7 @@ class Plugin(object):
         block_devices = []
         for volume in volumes:
             try:
-                self.pipe_exec(["/usr/bin/packet-block-storage-attach", "-m", "queue", volume.name], log_stdout=True)
+                self.pipe_exec(["/usr/bin/packet-block-storage-attach", "-m", "queue", volume.name], log_stdout=True, lock_cmd=True)
             except PipeExecError:
                 raise OperationFailureError("/usr/bin/packet-block-storage-attach {} failed: {}".format(volume.name, traceback.format_exc()))
 
@@ -441,6 +472,8 @@ class Plugin(object):
         self.pipe_exec(["/sbin/multipath", "-l"], log_stdout=True)
 
         if self.fs_handler.mount(mount_dir, block_devices, options):
+            os.chmod(mount_dir, 0o777)
+            self.pipe_exec(["/bin/ls", "-ld", mount_dir], log_stdout=True)
             return self.response(status="Success")
 
         raise OperationFailureError("mount failed")
@@ -508,7 +541,7 @@ class Plugin(object):
 
         for volume_name in volume_names:
             try:
-                self.pipe_exec(["/usr/bin/packet-block-storage-detach", volume_name], log_stdout=True)
+                self.pipe_exec(["/usr/bin/packet-block-storage-detach", volume_name], log_stdout=True, lock_cmd=True)
             except PipeExecError:
                 raise OperationFailureError("/usr/bin/packet-block-storage-detach failed: {}".format(traceback.format_exc()))
 
