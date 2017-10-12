@@ -23,3 +23,6 @@ push:
 
 test-live:
 	flexvolume/packet/test/test_live.py
+
+check:
+	pylint --reports=n flexvolume
