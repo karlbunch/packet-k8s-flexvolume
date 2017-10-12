@@ -171,7 +171,7 @@ class FilesystemHandlerZFS(FilesystemHandler):
     def import_pool(self, pool, options):
         """ import and existing pool """
         try:
-            self.pipe_exec(["/sbin/zpool", "import", "-N", str(pool.guid)])
+            self.pipe_exec(["/sbin/zpool", "import", "-d", "/dev/mapper", "-N", str(pool.guid)])
             self.log.info("imported pool %s (%s)", pool.name, pool.guid)
         except exceptions.FSHandlerFatalError as err:
             if not "a pool with that name already exists" in err.message:
