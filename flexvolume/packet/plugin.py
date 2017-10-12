@@ -57,7 +57,7 @@ class Plugin(object):
         self.config = yaml.load(open(os.path.expanduser("/etc/kubernetes/flexvolume-packet.conf")))
         self.api_manager = None
         self.fs_handler = None
-        self.lock_fh = {}
+        self.locks = {}
 
         if logger:
             self.log = logger
@@ -86,22 +86,26 @@ class Plugin(object):
 
         return self.api_manager
 
-    def get_lock(self, lock_key):
+    def get_lock(self, lock_path):
         """ Acquire a simple lock on an operation """
-        lock_key = "/tmp/lck.flexvolume.packet.%s" % lock_key.replace("/", "-").replace(".", "_")
-        self.lock_fh[lock_key] = open(lock_key, "w")
+        lock_key = "/tmp/lck.flexvolume.packet.%s" % lock_path.replace("/", "-").replace(".", "_")
+        self.log.debug("LOCK KEY %s: Locking...", lock_key)
+        self.locks[lock_key] = (open(lock_key, "w"), lock_path)
         tm_start = time.time()
-        fcntl.lockf(self.lock_fh[lock_key].fileno(), fcntl.LOCK_EX)
-        self.log.debug("Waited %.02f second(s) to get lock %s", time.time() - tm_start, lock_key)
+        fcntl.lockf(self.locks[lock_key][0].fileno(), fcntl.LOCK_EX)
+        self.log.debug("LOCKED KEY %s after %.02fs seconds", lock_key, time.time() - tm_start)
         return lock_key
 
     def release_lock(self, lock_key):
         """ Acquire a simple lock on an operation """
-        if lock_key in self.lock_fh:
-            fcntl.lockf(self.lock_fh[lock_key].fileno(), fcntl.LOCK_UN)
-            self.lock_fh[lock_key].close()
-            os.unlink(lock_key)
-            self.lock_fh.pop(lock_key, None)
+        if lock_key in self.locks:
+            self.log.debug("LOCK KEY %s: Release...", lock_key)
+            fcntl.lockf(self.locks[lock_key][0].fileno(), fcntl.LOCK_UN)
+            self.log.debug("LOCK KEY %s: Released", lock_key)
+            self.locks[lock_key][0].close()
+            #os.unlink(lock_key)
+            self.locks.pop(lock_key, None)
+            self.log.debug("LOCKS %s", str(self.locks))
         else:
             self.log.warning("Attempt to clear non-existant lock? %s", lock_key)
 
@@ -500,17 +504,17 @@ class Plugin(object):
 
         if fsType is None:
             self.log.warning("Can't find fsType for %s volumes may be stuck attached to this host.", mount_dir)
-
-        self.fs_handler = get_handler(fsType, log=self.log)
-
-        status, block_devices = self.fs_handler.unmount(mount_dir)
+            return self.response(status="Success", message="WARNING: Not in /proc/mounted")
+        else:
+            self.fs_handler = get_handler(fsType, log=self.log)
+            status, block_devices = self.fs_handler.unmount(mount_dir)
 
         if not status:
             # If fs_handler.unmount returned False we try old fashioned os umount(8)
             # NOTE: This means the underlying volumes might not be detachable!
             try:
                 self.pipe_exec(["/bin/umount", mount_dir], log_stdout=True)
-            except PipeExecError:
+            except PipeExecError as err:
                 raise OperationFailureError("umount failed: {}".format(traceback.format_exc()))
 
         # Now try and detach the volumes
