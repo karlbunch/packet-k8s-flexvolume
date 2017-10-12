@@ -283,8 +283,8 @@ class Plugin(object):
 
         return True
 
-    def find_volumes(self, options, create=False):
-        """ Find volumes needed for this operation """
+    def find_volumes_using_name(self, volume_name):
+        """ Find volumes given a specific volume_name """
         volumes = []
 
         self.log.debug("Getting list of volumes for project %s", self.config["project"]["id"])
@@ -299,7 +299,7 @@ class Plugin(object):
 
             self.log.debug("Found volume %s @ %s = %s", volume.id, volume.facility.code, metadata)
 
-            if metadata['pv'] == options.volumeName:
+            if metadata['pv'] == volume_name:
                 if volume.facility.code == self.config["facility"]["code"]:
                     volumes.append(volume)
                 else:
@@ -308,6 +308,12 @@ class Plugin(object):
                     return None
 
         self.log.debug("Received %s volumes in %.03f seconds", len(volumes), time.time() - tm_start)
+
+        return volumes
+
+    def find_volumes(self, options, create=False):
+        """ Find volumes needed for this operation """
+        volumes = self.find_volumes_using_name(options.volumeName)
 
         if volumes:
             return volumes
@@ -393,6 +399,57 @@ class Plugin(object):
                         return device
 
         raise OperationFailureError("Unable to find device/host to attach volumes to.")
+
+    def op_manual_destroy(self, pv_volume_name):
+        """ Non-standard operation for manual cleanup of underlying block store volumes for a Kubernetes PV """
+        volumes = self.find_volumes_using_name(pv_volume_name)
+
+        if not volumes:
+            msg = "No volumes found for volumeName: {}".format(pv_volume_name)
+            self.log.info(msg)
+            return self.response(status="Success", message=msg)
+
+        volume_names = []
+
+        for volume in volumes:
+            if volume.locked:
+                raise OperationFailureError("Volume {} is locked, can not destroy volume.".format(volume.name))
+
+            volume_names.append(volume.name)
+
+        self.log.info("Detaching Volume(s): %s", ", ".join(volume_names))
+
+        for volume_name in volume_names:
+            try:
+                self.pipe_exec(["/usr/bin/packet-block-storage-detach", volume_name], log_stdout=True, lock_cmd=True)
+            except PipeExecError:
+                raise OperationFailureError("/usr/bin/packet-block-storage-detach failed: {}".format(traceback.format_exc()))
+
+        self.log.info("Block devices detached.")
+
+        # Have to give blockstore time to notice we logged out of the volume
+        time.sleep(10)
+
+        self.log.info("Detaching volumes from hosts")
+
+        for volume in volumes:
+            for i in range(10, -1, -1):
+                try:
+                    volume.detach()
+                    self.log.info("Detached volume %s from hosts", volume.name)
+                    break
+                except packet.Error as err:
+                    self.log.info("Retry #%d: Failed to detach %s: %s", i, volume.name, err)
+                    if i:
+                        time.sleep(10)
+                    else:
+                        raise
+
+        for volume in volumes:
+            volume.delete()
+            self.log.info("Deleted volume %s", volume.name)
+
+        return self.response(status="Success", message="destroyed volumes related to {}: {}".format(pv_volume_name, ", ".join(volume_names)))
 
     # pylint: disable=too-many-branches
     def op_mount(self, mount_dir, json_options):
