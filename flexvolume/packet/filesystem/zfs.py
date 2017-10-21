@@ -256,6 +256,9 @@ class FilesystemHandlerZFS(FilesystemHandler):
         else:
             pool = self.create_pool(devices, options)
 
+        # Hide ./.zfs so it doesn't confuse stuff like chown -R and rsync etc.
+        self.pipe_exec(["/sbin/zfs", "set", "snapdir=hidden", pool.name])
+
         # Mount pool filesystem to mount_dir
         self.pipe_exec(["/sbin/zfs", "set", "mountpoint=" + mount_dir, pool.name])
 
