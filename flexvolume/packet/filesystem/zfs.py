@@ -151,13 +151,11 @@ class FilesystemHandlerZFS(FilesystemHandler):
 
     def create_pool(self, devices, options):
         """ Create a fresh pool using provided devices and options """
-        # New pool name, watch out for ZFS_MAX_DATASET_NAME_LEN(256)
-        pool_name = "kubernetes-packet-volume-" + options.volumeName
-        pool_name = pool_name[:255]
-
         # Should be empty volume(s) create zpool
         # TODO handle volumes > 2 (i.e. 4 would be mirror D0 D1 mirror D2 D3)
         # TODO handle raidz
+        pool_name = options.packet.zfs.poolName
+
         cmd = ["/sbin/zpool", "create", "-O", "canmount=noauto"]
         cmd = cmd + options.packet.zfs.createOptions.split(" ")
         cmd = cmd + [pool_name, options.packet.zfs.vdevType] + devices
