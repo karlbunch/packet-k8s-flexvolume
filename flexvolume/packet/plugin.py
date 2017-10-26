@@ -255,6 +255,13 @@ class Plugin(object):
             if opts["packet.net/zfs/snapshotOnMount"] == "true":
                 zfs_options["snapshotOnMount"] = True
 
+        pool_name = "kubernetes-packet-volume-" + opts["kubernetes.io/pvOrVolumeName"]
+
+        if "packet.net/zfs/poolName" in opts:
+            pool_name = opts["packet.net/zfs/poolName"]
+
+        zfs_options["poolName"] = pool_name[:255]
+
         try:
             options = types.SimpleNamespace(**{
                 "volumeName": opts["kubernetes.io/pvOrVolumeName"],
@@ -291,13 +298,14 @@ class Plugin(object):
         tm_start = time.time()
 
         # See if the volumes already exist, using volume description yaml look for option.volumeName
-        for volume in self.get_manager().list_volumes(self.config["project"]["id"]):
+        for volume in self.get_manager().list_volumes(self.config["project"]["id"], {"per_page": 1000}):
             metadata = yaml.load(volume.description)
 
             if not isinstance(metadata, dict) or "pv" not in metadata:
+                self.log.debug("Unable to decode metadata for volume %s: '%s'", volume.id, volume.description)
                 continue
 
-            self.log.debug("Found volume %s @ %s = %s", volume.id, volume.facility.code, metadata)
+            self.log.debug("Volume %s @ %s metadata: %s", volume.id, volume.facility.code, metadata)
 
             if metadata['pv'] == volume_name:
                 if volume.facility.code == self.config["facility"]["code"]:
