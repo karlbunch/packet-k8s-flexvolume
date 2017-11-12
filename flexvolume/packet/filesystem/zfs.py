@@ -135,12 +135,12 @@ class FilesystemHandlerZFS(FilesystemHandler):
     def find_pool_using_mount(self, target_mount_dir):
         """ Find a pool using the mount point """
         # Ask zfs for a list of zfs_name,mountpoint
-        result = self.pipe_exec(["/sbin/zfs", "list", "-H", "-o", "name,mountpoint"])
+        result = self.pipe_exec(["/sbin/zfs", "list", "-H", "-o", "mounted,name,mountpoint"])
 
         for line in result.stdout.rstrip().decode('utf-8').split("\n"):
-            zfs_name, mount_dir = line.split()
+            is_mounted, zfs_name, mount_dir = line.split()
 
-            if mount_dir == target_mount_dir:
+            if is_mounted == "yes" and mount_dir == target_mount_dir:
                 pool = _ZFSPool(pool_name=zfs_name.split('/')[0])
 
                 self.log.debug("find_pool_using_mount returning %s", pool)
