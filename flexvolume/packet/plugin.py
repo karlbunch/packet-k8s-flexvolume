@@ -523,6 +523,7 @@ class Plugin(object):
                 # Look for /dev/mapper/{wwid}
                 with open("/etc/multipath/bindings") as fobj:
                     for map_line in fobj.readlines():
+                        # TODO handle bindings file having blank wwid
                         map_volumeName, map_wwid = map_line.rstrip().split(" ")
 
                         if map_volumeName == volume.name:
@@ -621,7 +622,7 @@ class Plugin(object):
 
         self.log.info("Detaching volumes from host.")
 
-        for volume in self.get_manager().list_volumes(self.config["project"]["id"]):
+        for volume in self.get_manager().list_volumes(self.config["project"]["id"], {"per_page": 1000}):
             if volume.name in volume_names:
                 # Appears the current python-packet library just detaches the volume from everything!!
                 # TODO consider a PR to only detach from specific device
