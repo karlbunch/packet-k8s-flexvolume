@@ -152,13 +152,23 @@ class FilesystemHandlerZFS(FilesystemHandler):
     def create_pool(self, devices, options):
         """ Create a fresh pool using provided devices and options """
         # Should be empty volume(s) create zpool
-        # TODO handle volumes > 2 (i.e. 4 would be mirror D0 D1 mirror D2 D3)
-        # TODO handle raidz
         pool_name = options.packet.zfs.poolName
 
         cmd = ["/sbin/zpool", "create", "-O", "canmount=noauto"]
         cmd = cmd + options.packet.zfs.createOptions.split(" ")
-        cmd = cmd + [pool_name, options.packet.zfs.vdevType] + devices
+        cmd = cmd + [pool_name]
+
+        if options.packet.zfs.vdevType == "mirror":
+            # vdev spec should be: mirror D0 D1 mirror D2 D3 ...)
+            for i, device in enumerate(devices):
+                if i % 2 == 0:
+                    cmd = cmd + [options.packet.zfs.vdevType]
+
+                cmd = cmd + [device]
+        elif options.packet.zfs.vdevType == "raidz":
+            cmd = cmd + [pool_name, options.packet.zfs.vdevType] + devices
+        else:
+            raise exceptions.FSHandlerFatalError("Unsupported vdev config: {}".format(options.packet.zfs.vdevType))
 
         self.pipe_exec(cmd)
 

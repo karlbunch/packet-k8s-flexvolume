@@ -16,8 +16,8 @@ push:
 	for host in $$(kubectl get nodes -o jsonpath='{range.items[*]}{.metadata.name}{"\n"}{end}'); \
 	do \
 	    echo "Push to $$host"; \
-	    ssh -q $$host 'logger -t fv_packet_zfs "#################### PUSHING packet~flexvolume ####################"'; \
-	    scp -q flexvolume-packet.conf /etc/kubernetes/flexvolume-packet.conf; \
+	    ssh $$host 'logger -t fv_packet_zfs "#################### PUSHING packet~flexvolume ####################"'; \
+	    scp -q flexvolume-packet.conf $$host:/etc/kubernetes/flexvolume-packet.conf; \
 	    scp -q -r stage/. $$host:/usr/libexec/kubernetes/kubelet-plugins/volume/exec/packet~flexvolume/; \
 	done;
 
